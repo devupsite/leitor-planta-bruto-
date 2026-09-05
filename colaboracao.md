@@ -26,10 +26,10 @@ Por ora o deploy é **somente GitHub Pages (site estático, sem backend/serverle
 
 Por causa disso:
 - **Fases 1 e 2 (IFC e DWG/DXF) são o foco atual** — são resolvíveis 100% client-side, sem IA paga, usando `web-ifc` (WASM) para IFC e `dxf-parser` (JS puro) para DXF.
-- **Fase 3 (PDF/imagem escaneada) — DESBLOQUEADA, mas não implantada ainda.** Em vez de função serverless, a decisão foi reaproveitar um secret `ANTHROPIC_API_KEY` que já existe num servidor Hostinger (PHP, hospedagem compartilhada), usado por outro projeto/repo. Um script de proxy (`claude-vision-proxy.php`) foi escrito numa sessão anterior e entregue ao usuário para deploy manual nesse servidor — **este repo não tem acesso a essa hospedagem, então nenhuma sessão aqui consegue fazer esse deploy sozinha.** Antes de plugar a Fase 3 no front-end:
-  1. Confirmar com o usuário que o proxy PHP já foi implantado na Hostinger e testado (chamada de exemplo retornando resposta válida da Anthropic).
-  2. Confirmar a URL final do endpoint (algo como `https://dominio-hostinger.com/claude-vision-proxy.php` ou um subdomínio dedicado).
-  3. Só então integrar a chamada `fetch()` no `frontend/app.js`.
+- **Fase 3 (PDF/imagem escaneada) — VALIDADA DE PONTA A PONTA EM PRODUÇÃO.** Endpoint ativo: `https://brutoceramica.com.br/api/planta-vision-proxy.php`. Arquitetura: ponte pública sem segredo (repo `devupsite/bruto`, `api/planta-vision-proxy.php`, deploy automático) → `require` de `bruto-secrets/API/planta-vision.php` (upload manual, nunca via Git) → `require` de `bruto-secrets/bruto-config.php` (define a constante `ANTHROPIC_API_KEY`, mesmo arquivo que `chat.php`/`suite-ia.php` usam).
+  - A chamada usa **tool use forçado** (`tool_choice: {type: "tool", name: "reportar_ambientes"}`) com schema fixo, e **`thinking: disabled` + `effort: low`** — necessário porque adaptive thinking (ligado por padrão no Sonnet 5) pode consumir o `max_tokens` "pensando" antes de responder, truncando a extração. Ver `server/planta-vision.php` (cópia de referência) para o código completo.
+  - Resposta do endpoint já vem simplificada (só `{ambientes, dimensoes_totais, escala_indicada}`, sem o envelope da API) — mais fácil de consumir no front-end.
+  - Cópias de referência do código PHP real (sem segredo) ficam em `/server/` neste repo — **manter atualizadas** se o código no servidor mudar.
 - Não implemente chamada de API do Claude direto do front-end sob nenhuma circunstância, mesmo que pareça funcionar em teste local — isso expõe a chave publicamente assim que for para o GitHub Pages. A chave só pode ser lida server-side, dentro do proxy PHP na Hostinger.
 
 ---
@@ -86,6 +86,24 @@ colaboracao.md       → este arquivo
 ## Log de sessões
 
 > Toda sessão adiciona uma entrada nova no topo desta lista. Nunca apague entradas antigas.
+
+### 05/09/2026 — Fase 3 validada em produção + Fase 3.5 (layout aproximado no viewer)
+- Contexto: continuação direta da sessão anterior. Usuário testou o proxy manualmente (via página `frontend/teste-proxy.html`) com uma planta real, iterando comigo até o resultado ficar limpo e completo.
+- O que foi feito:
+  - **Debug em produção, junto com o usuário:** descoberto que o secret não usa `getenv()` (como eu tinha suposto errado numa sessão anterior), e sim `require` de `bruto-config.php` com `define('ANTHROPIC_API_KEY', ...)`. Corrigido `planta-vision.php` para esse padrão.
+  - **Incidente de segurança:** o usuário colou a chave real da Anthropic e a senha do MySQL em texto puro no chat, mesmo após meu pedido pra ocultar. Orientei rotação imediata das duas credenciais. **Se uma sessão futura for mexer em `bruto-config.php` ou no banco `u764636502_bruto_interno`, confirme com o usuário se essa rotação já foi feita** — não presuma que as credenciais atuais são as mesmas descritas em sessões anteriores.
+  - Corrigido truncamento (`stop_reason: max_tokens`) causado por adaptive thinking consumindo o budget — solução: `thinking: {type: "disabled"}` + `output_config: {effort: "low"}`, documentado como prática recomendada da Anthropic para tarefas de extração estruturada.
+  - Trocado prompt solto por **tool use forçado** com schema fixo (`reportar_ambientes`: nome, área, tipo de piso indicado) — formato de saída agora é garantido, não depende do modelo "lembrar" de fechar o JSON certo.
+  - Endpoint testado e validado em produção com planta real: `https://brutoceramica.com.br/api/planta-vision-proxy.php` — retornou 9 ambientes corretamente, com área e piso indicado.
+  - **Fase 3.5 (novo):** `frontend/app.js` reescrito — adicionado upload de imagem real (`#upload-planta`), com redimensionamento client-side antes de enviar (economiza tokens/latência). Resultado do endpoint gera um layout aproximado: um piso por ambiente, lado = `sqrt(área)`, disposto em grade e centralizado, com label de texto (sprite/canvas) por ambiente. Revestimento selecionado no dropdown já se aplica a todos os pisos do layout.
+  - Adicionada pasta `/server/` neste repo com cópias de referência do código PHP real (sem segredo), já que o código de verdade mora em dois repos/servidores diferentes (`bruto` + Hostinger) que sessões futuras neste repo não acessam diretamente.
+- Arquivos alterados: `colaboracao.md`, `frontend/index.html`, `frontend/app.js`, `frontend/style.css`, `server/planta-vision-proxy.php` (novo), `server/planta-vision.php` (novo), `server/README.md` (novo).
+- Status: EM ANDAMENTO.
+  - Upload real + layout aproximado: **implementado, mas não testado visualmente em navegador por mim** — só revisão de lógica. Próxima sessão (ou o usuário) deve testar o upload de ponta a ponta na página publicada e confirmar que o layout aparece, os labels ficam legíveis, e a troca de revestimento funciona nos pisos gerados.
+  - Layout é deliberadamente aproximado (retângulos quadrados por área, não a geometria real) — está documentado no `hint` da UI para não passar falsa precisão ao lead.
+- Notas para a próxima sessão:
+  - Se o teste visual passar, próximos candidatos: (a) mapear `tipo_piso_indicado` do resultado da IA para sugerir automaticamente um revestimento do catálogo por ambiente, em vez do usuário escolher manualmente um só pra tudo; (b) considerar limite de tamanho de arquivo/timeout mais claro na UI para o usuário saber que está processando; (c) iniciar a Fase 1 (IFC via `web-ifc`) como caminho paralelo pra plantas que já vêm em 3D.
+  - Lembrar de manter `/server/` sincronizado se o código real no `bruto` ou na Hostinger mudar de novo.
 
 ### 04/09/2026 — Fase 0 (viewer Three.js) + desbloqueio da Fase 3 (proxy PHP)
 - Contexto: continuação da sessão de planejamento. Usuário forneceu token temporário de push para este repo (já deve ter sido revogado — não depender dele em sessões futuras, pedir um novo).
