@@ -26,8 +26,11 @@ Por ora o deploy é **somente GitHub Pages (site estático, sem backend/serverle
 
 Por causa disso:
 - **Fases 1 e 2 (IFC e DWG/DXF) são o foco atual** — são resolvíveis 100% client-side, sem IA paga, usando `web-ifc` (WASM) para IFC e `dxf-parser` (JS puro) para DXF.
-- **Fase 3 (PDF/imagem escaneada) está PAUSADA** — depende de Claude Vision para ler rótulos/ambientes, o que exige uma função serverless (Vercel/Cloudflare Workers) para não expor a chave. Não implemente chamada de API do Claude direto do front-end sob nenhuma circunstância, mesmo que pareça funcionar em teste local — isso expõe a chave publicamente assim que for para o GitHub Pages. Se uma sessão futura for destravar a Fase 3, o primeiro passo é decidir a hospedagem da função serverless, não escrever o código de integração.
-- Se o usuário disser que já resolveu a hospedagem da API (ex: migrou para Vercel), atualize esta seção antes de mexer na Fase 3.
+- **Fase 3 (PDF/imagem escaneada) — DESBLOQUEADA, mas não implantada ainda.** Em vez de função serverless, a decisão foi reaproveitar um secret `ANTHROPIC_API_KEY` que já existe num servidor Hostinger (PHP, hospedagem compartilhada), usado por outro projeto/repo. Um script de proxy (`claude-vision-proxy.php`) foi escrito numa sessão anterior e entregue ao usuário para deploy manual nesse servidor — **este repo não tem acesso a essa hospedagem, então nenhuma sessão aqui consegue fazer esse deploy sozinha.** Antes de plugar a Fase 3 no front-end:
+  1. Confirmar com o usuário que o proxy PHP já foi implantado na Hostinger e testado (chamada de exemplo retornando resposta válida da Anthropic).
+  2. Confirmar a URL final do endpoint (algo como `https://dominio-hostinger.com/claude-vision-proxy.php` ou um subdomínio dedicado).
+  3. Só então integrar a chamada `fetch()` no `frontend/app.js`.
+- Não implemente chamada de API do Claude direto do front-end sob nenhuma circunstância, mesmo que pareça funcionar em teste local — isso expõe a chave publicamente assim que for para o GitHub Pages. A chave só pode ser lida server-side, dentro do proxy PHP na Hostinger.
 
 ---
 
@@ -83,6 +86,20 @@ colaboracao.md       → este arquivo
 ## Log de sessões
 
 > Toda sessão adiciona uma entrada nova no topo desta lista. Nunca apague entradas antigas.
+
+### 04/09/2026 — Fase 0 (viewer Three.js) + desbloqueio da Fase 3 (proxy PHP)
+- Contexto: continuação da sessão de planejamento. Usuário forneceu token temporário de push para este repo (já deve ter sido revogado — não depender dele em sessões futuras, pedir um novo).
+- Arquivos alterados: `colaboracao.md` (renomeado de `colaboracao (1).md`, seção de arquitetura da Fase 3 atualizada), `README.md` (novo), `dataset/README.md` (novo), `frontend/index.html`, `frontend/style.css`, `frontend/app.js` (novos — Fase 0 completa).
+- O que foi feito:
+  - Fase 0: viewer 3D funcional com Three.js (via CDN, import map, sem build step). Sala procedural (piso + 4 paredes gerados por código, sem depender de nenhum arquivo de planta real ainda). Dropdown na sidebar troca o material do piso entre 3 opções placeholder (cor + rugosidade — ainda não são fotos reais do catálogo, ver `dataset/README.md`). Função `applyRevestimento(mesh, revestimento)` em `app.js` é o ponto de integração pensado para os parsers futuros (Fase 1/2 só precisam entregar a mesh certa).
+  - Fase 3 desbloqueada arquiteturalmente: em vez de função serverless, decisão foi reaproveitar um secret `ANTHROPIC_API_KEY` já existente num servidor Hostinger (PHP) usado por outro projeto do usuário. Script `claude-vision-proxy.php` foi escrito e entregue ao usuário (fora deste repo, no chat) — ver detalhes na seção de arquitetura acima. **Não implantado ainda.**
+- Status: EM ANDAMENTO.
+  - Fase 0: funcional para o cenário procedural, mas **não testada visualmente em navegador real por mim** — só revisão de lógica. Próxima sessão (ou o próprio usuário) deve abrir a página publicada e confirmar: (a) a sala renderiza corretamente, (b) o dropdown troca o material do piso sem erros no console, (c) `OrbitControls` funciona (arrastar/zoom).
+  - Fase 3: código escrito, mas não implantado na Hostinger nem testado ponta a ponta. Falta confirmar com o usuário se/quando o deploy do PHP foi feito, e qual a URL final do endpoint, antes de integrar no front-end.
+- Notas para a próxima sessão:
+  - Se o teste visual da Fase 0 for feito e a sala aparecer, o próximo passo natural é plugar `web-ifc` (Fase 1): carregar um arquivo IFC real de exemplo, identificar a mesh de piso por metadado/camada, e chamar `applyRevestimento()` nela em vez de na sala procedural.
+  - Ao integrar a Fase 3, adicionar tratamento de erro no front-end para quando o proxy não responder (timeout, CORS mal configurado, etc.) — o lead não pode ficar com uma tela travada sem feedback.
+  - Avaliar, junto com o usuário, se vale adicionar um `push-com-token.md` neste repo (como no projeto irmão) para padronizar como sessões futuras recebem token de push, já que isso se repetiu nesta sessão.
 
 ### [Adicionar aqui: data da criação do repo] — Setup inicial (conversa de planejamento, sem código ainda)
 - Contexto: planejamento inicial do projeto com o usuário, antes da criação do repo. Definido o roadmap em 4 fases (IFC/OBJ nativo → DWG/DXF → PDF/imagem escaneada com IA → biblioteca de texturas), e a restrição de arquitetura de rodar 100% client-side no GitHub Pages por enquanto, adiando a Fase 3 (que depende de Claude Vision) até haver uma função serverless disponível.

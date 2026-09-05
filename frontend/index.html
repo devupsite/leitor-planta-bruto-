@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leitor de Planta — Bruto</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <aside id="panel">
+      <h1>Leitor de Planta</h1>
+      <p class="subtitle">Visualização de revestimento — protótipo Fase 0</p>
+
+      <label for="revestimento-select">Revestimento no piso</label>
+      <select id="revestimento-select"></select>
+
+      <div class="status-box">
+        <p><strong>Ambiente:</strong> <span id="status-text">sala de exemplo (procedural)</span></p>
+        <p class="hint">Upload de planta real ainda não está conectado — isto valida o motor 3D e a troca de material antes de plugar os parsers de IFC/DXF.</p>
+      </div>
+    </aside>
+
+    <main id="viewer-container"></main>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
