@@ -10,14 +10,17 @@
   <div id="app">
     <aside id="panel">
       <h1>Leitor de Planta</h1>
-      <p class="subtitle">Visualização de revestimento — protótipo Fase 0</p>
+      <p class="subtitle">Visualização de revestimento — protótipo</p>
 
       <label for="revestimento-select">Revestimento no piso</label>
       <select id="revestimento-select"></select>
 
+      <label for="upload-planta">Enviar planta (imagem)</label>
+      <input type="file" id="upload-planta" accept="image/*" />
+
       <div class="status-box">
-        <p><strong>Ambiente:</strong> <span id="status-text">sala de exemplo (procedural)</span></p>
-        <p class="hint">Upload de planta real ainda não está conectado — isto valida o motor 3D e a troca de material antes de plugar os parsers de IFC/DXF.</p>
+        <p><strong id="status-label">Ambiente:</strong> <span id="status-text">sala de exemplo (procedural)</span></p>
+        <p class="hint">Layout gerado a partir da leitura da planta é aproximado — piso por ambiente, dimensionado pela área identificada. Não é a geometria exata do projeto.</p>
       </div>
     </aside>
 
