@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>Teste — Proxy Claude Vision</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; color: #222; }
+  h1 { font-size: 1.3rem; }
+  label { display: block; margin-top: 16px; font-size: 0.9rem; color: #555; }
+  input[type="text"] { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+  button { margin-top: 16px; padding: 10px 18px; font-size: 0.95rem; cursor: pointer; }
+  pre { background: #f4f4f4; padding: 14px; border-radius: 6px; white-space: pre-wrap; word-break: break-word; margin-top: 20px; }
+  .status { font-weight: 600; margin-top: 16px; }
+  .ok { color: #1a7a3c; }
+  .erro { color: #b3261e; }
+</style>
+</head>
+<body>
+  <h1>Teste do proxy — Leitor de Planta</h1>
+  <p>Escolha uma imagem de planta e clique em testar. Isso chama o endpoint diretamente, sem precisar de terminal.</p>
+
+  <label for="url">URL do endpoint</label>
+  <input type="text" id="url" value="https://brutoceramica.com.br/api/planta-vision-proxy.php" />
+
+  <label for="file">Imagem da planta</label>
+  <input type="file" id="file" accept="image/*" />
+
+  <button id="testar">Testar</button>
+
+  <p id="status"></p>
+  <pre id="resultado"></pre>
+
+<script>
+document.getElementById('testar').addEventListener('click', async () => {
+  const url = document.getElementById('url').value.trim();
+  const fileInput = document.getElementById('file');
+  const statusEl = document.getElementById('status');
+  const resultadoEl = document.getElementById('resultado');
+
+  resultadoEl.textContent = '';
+  statusEl.textContent = '';
+  statusEl.className = 'status';
+
+  if (!url) {
+    statusEl.textContent = 'Cole a URL do endpoint primeiro.';
+    statusEl.classList.add('erro');
+    return;
+  }
+  if (!fileInput.files[0]) {
+    statusEl.textContent = 'Escolha uma imagem primeiro.';
+    statusEl.classList.add('erro');
+    return;
+  }
+
+  statusEl.textContent = 'Enviando...';
+
+  try {
+    const file = fileInput.files[0];
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_base64: base64, media_type: file.type || 'image/jpeg' }),
+    });
+
+    const text = await res.text();
+    statusEl.textContent = `Resposta recebida — HTTP ${res.status}`;
+    statusEl.classList.add(res.ok ? 'ok' : 'erro');
+
+    try {
+      resultadoEl.textContent = JSON.stringify(JSON.parse(text), null, 2);
+    } catch {
+      resultadoEl.textContent = text;
+    }
+  } catch (err) {
+    statusEl.textContent = 'Erro de rede/CORS — ver detalhe abaixo.';
+    statusEl.classList.add('erro');
+    resultadoEl.textContent = String(err);
+  }
+});
+</script>
+</body>
+</html>
